@@ -84,9 +84,9 @@ def reshape( width, height):
     gluOrtho2D(0,width,height,0)
     glMatrixMode (GL_MODELVIEW)
 
-def mouse (button, state, x, y):
+def mouse (state, x, y):
     global lastx,lasty,picked
-    if state!=GLUT_DOWN: return
+    if state!= GLUT_DOWN: return
     if mode == "CREATE REACT":
         shapes.append(Rect([[x,y],[x,y]]))
     elif mode == "CREATE CIRCLE":
