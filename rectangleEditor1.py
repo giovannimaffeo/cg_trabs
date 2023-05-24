@@ -8,6 +8,27 @@ from pyrr.matrix44 import *
 
 shapes = []
 
+def calculate_norm(v):
+    norm = sqrt(v[0] ** 2 + v[1] ** 2)
+    return norm
+
+def angle_between_vectors(v1, v2):
+    v1_norm = calculate_norm(v1)
+    v2_norm = calculate_norm(v2)
+    dot_product = v1[0] * v2[0] + v1[1] * v2[1]
+    cos_theta = dot_product / (v1_norm * v2_norm)
+    
+    if abs(cos_theta) > 1:
+        # Vetores colineares, definir ângulo como 0 ou pi
+        if cos_theta > 0:
+            theta = 0
+        else:
+            theta = pi
+    else:
+        sin_theta = sqrt(1 - cos_theta**2)
+        theta = atan2(sin_theta, cos_theta)
+    return theta
+
 class Circle(object):
     def __init__(self, center, radius, m=create_identity()):
         self.center = center
@@ -22,8 +43,11 @@ class Circle(object):
         self.invm = inverse(t)
     def contains(self, p):
         p = apply_to_vector(self.invm, [p[0], p[1], 0, 1])
-        distance = sqrt((p[0] - self.center[0]) ** 2 + (p[1] - self.center[1]) ** 2)
+        diff = [p[0] - self.center[0], p[1] - self.center[1]]
+        distance = calculate_norm(diff)
         return distance <= self.radius
+    def get_center(self):
+        return self.center
     def draw(self, mode="fill"):
         glPushMatrix()
         glMultMatrixf(self.m)
@@ -67,6 +91,10 @@ class Rect(object):
         ymin = min(self.points[0][1],self.points[1][1])
         ymax = max(self.points[0][1],self.points[1][1])
         return xmin <= p[0] <= xmax and ymin <=p[1] <= ymax
+    def get_center(self):
+        x = (self.points[0][0] + self.points[1][0]) / 2
+        y = (self.points[0][1] + self.points[1][1]) / 2
+        return (x, y)
     def draw (self):
         glPushMatrix()
         glMultMatrixf(self.m)
@@ -74,7 +102,7 @@ class Rect(object):
         glPopMatrix()
 
 picked = None
-modeConstants = ["CREATE REACT", "CREATE CIRCLE", "TRANSLATE"]
+modeConstants = ["CREATE REACT", "CREATE CIRCLE", "TRANSLATE", "ROTATE", "CENTER"]
 mode = modeConstants[0]
 
 def reshape( width, height):
@@ -84,7 +112,7 @@ def reshape( width, height):
     gluOrtho2D(0,width,height,0)
     glMatrixMode (GL_MODELVIEW)
 
-def mouse (state, x, y):
+def mouse (button, state, x, y):
     global lastx,lasty,picked
     if state!= GLUT_DOWN: return
     if mode == "CREATE REACT":
@@ -96,22 +124,46 @@ def mouse (state, x, y):
         for s in shapes:
             if s.contains([x,y]): picked = s
         lastx,lasty = x,y
+    elif mode == "ROTATE":
+        picked = None
+        for s in shapes:
+            if s.contains([x,y]): picked = s
+        lastx,lasty = x,y             
 
 def mouse_drag(x, y):
+    global lastx, lasty
     if mode == "CREATE REACT":
         shapes[-1].set_point(1,[x,y])
     elif mode == "CREATE CIRCLE":
         s = shapes[-1]
         diff = [x - s.center[0], y - s.center[1]]
-        # ||v|| = sqrt(x^2 + y^2)
-        norm_diff = sqrt((diff[0] ** 2 + diff[1] ** 2))
+        norm_diff = calculate_norm(diff)
         s.set_radius(norm_diff)
     elif mode == "TRANSLATE":
         if picked:
-            global lastx,lasty
             t = create_from_translation([x-lastx,y-lasty,0])
             picked.set_matrix(multiply(picked.m,t))
             lastx,lasty=x,y
+    elif mode == "ROTATE":
+        if picked:
+            center = picked.get_center()
+            vec_mouse = [lastx - center[0], lasty - center[1]]
+            vec_mouse_drag = [x - center[0], y - center[1]]
+            theta = angle_between_vectors(vec_mouse, vec_mouse_drag)
+
+            # Determinar o sentido da rotação com base no ângulo entre os vetores
+            if vec_mouse[0] * vec_mouse_drag[1] - vec_mouse[1] * vec_mouse_drag[0] > 0:
+                theta *= -1  # Inverter o sentido da rotação
+
+            t1 = create_from_translation([-center[0], -center[1], 0])
+            t2 = create_from_z_rotation(theta)
+            t3 = create_from_translation([center[0], center[1], 0])
+
+            t = multiply(t2, t3)
+            t = multiply(t1, t)
+            picked.set_matrix(multiply(picked.m, t))
+
+            lastx, lasty = x, y
     glutPostRedisplay()
 
 def display():
