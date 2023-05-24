@@ -47,7 +47,11 @@ class Circle(object):
         distance = calculate_norm(diff)
         return distance <= self.radius
     def get_center(self):
-        return self.center
+        # Retorna o centro resultado das transformações (mantém o centro do shape atualizado após 
+        # translações - info importante para os outros métodos)
+        center = [self.center[0], self.center[1], 0, 1]
+        transformed_center = apply_to_vector(self.m, center)
+        return (transformed_center[0], transformed_center[1])
     def draw(self, mode="fill"):
         glPushMatrix()
         glMultMatrixf(self.m)
@@ -92,9 +96,15 @@ class Rect(object):
         ymax = max(self.points[0][1],self.points[1][1])
         return xmin <= p[0] <= xmax and ymin <=p[1] <= ymax
     def get_center(self):
-        x = (self.points[0][0] + self.points[1][0]) / 2
-        y = (self.points[0][1] + self.points[1][1]) / 2
-        return (x, y)
+        # Retorna o centro resultado das transformações (mantém o centro do shape atualizado após 
+        # translações - info importante para os outros métodos)
+        center = [(self.points[0][0] + self.points[1][0]) / 2, (self.points[0][1] + self.points[1][1]) / 2, 0, 1]
+        transformed_center = apply_to_vector(self.m, center)
+        return (transformed_center[0], transformed_center[1])
+    def update_center(self, center_diff):
+        for i in range(len(self.points)):
+            new_point = [center_diff[0] + self.points[i][0], center_diff[1] + self.points[i][1]]
+            self.set_point(i, new_point)
     def draw (self):
         glPushMatrix()
         glMultMatrixf(self.m)
@@ -118,46 +128,12 @@ def mouse (button, state, x, y):
     if mode == "CREATE REACT":
         shapes.append(Rect([[x,y],[x,y]]))
     elif mode == "CREATE CIRCLE":
-        shapes.append(Circle([x,y], 0))
+        shapes.append(Circle([x,y], 0)) # Círculo de raio zero
     elif mode == "TRANSLATE" or mode == "ROTATE" or mode == "SCALE":
         picked = None
         for s in shapes:
             if s.contains([x,y]): picked = s
         lastx,lasty = x,y
-    """elif mode == "SCALE":
-        picked = None
-        for s in shapes:
-            if s.contains([x,y]):
-                print("picked")
-                picked = s
-                center = picked.get_center()
-                vec_mouse = [x - center[0], y - center[1]]
-                
-                # Calcula o ângulo entre o vetor vec_mouse e o eixo x
-                theta = angle_between_vectors(center, [1, 0, 0])
-                theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
-
-                print(theta)
-                print(theta_x_axis)
-                
-                # Calcula o fator de escala dx ao longo do vetor vec_mouse
-                dx = 100
-                
-                # Cria as transformações necessárias
-                t1 = create_from_translation([-center[0], -center[1], 0])
-                t2 = create_from_x_rotation(-theta_x_axis)
-                t3 = create_from_scale([1 + dx * 0.001, 1, 1])
-                print(theta_x_axis)
-                t4 = create_from_x_rotation(theta_x_axis - 0.16)
-                t5 = create_from_translation([center[0], center[1], 0])
-
-                # Multiplica as transformações na ordem correta
-                t = multiply(t4, t5)
-                t = multiply(t3, t)
-                t = multiply(t2, t)
-                t = multiply(t1, t)
-                
-                picked.set_matrix(multiply(picked.m, t))"""
 
 def mouse_drag(x, y):
     global lastx, lasty
@@ -165,8 +141,9 @@ def mouse_drag(x, y):
         shapes[-1].set_point(1,[x,y])
     elif mode == "CREATE CIRCLE":
         s = shapes[-1]
+        # Raio do círculo é a distância do click para o centro
         diff = [x - s.center[0], y - s.center[1]]
-        norm_diff = calculate_norm(diff)
+        norm_diff = calculate_norm(diff) 
         s.set_radius(norm_diff)
     elif mode == "TRANSLATE":
         if picked:
@@ -184,10 +161,14 @@ def mouse_drag(x, y):
             if vec_mouse[0] * vec_mouse_drag[1] - vec_mouse[1] * vec_mouse_drag[0] > 0:
                 theta *= -1  # Inverter o sentido da rotação
 
+            # Move centro da figura para a origem 
             t1 = create_from_translation([-center[0], -center[1], 0])
+            # Rotaciona em torno de "z" 
             t2 = create_from_z_rotation(theta)
+            # Volta com o centro da figura para posição original
             t3 = create_from_translation([center[0], center[1], 0])
 
+            # Sequência de transformações com multiplicações à direita
             t = multiply(t2, t3)
             t = multiply(t1, t)
             picked.set_matrix(multiply(picked.m, t))
@@ -195,104 +176,38 @@ def mouse_drag(x, y):
             lastx, lasty = x, y
     elif mode == "SCALE":
         if picked:
-            """center = picked.get_center()
-            vec_mouse = [lastx - center[0], lasty - center[1]]
-            vec_mouse_drag = [x - lastx, y - lasty]
-            theta = angle_between_vectors(vec_mouse, vec_mouse_drag)
-           
-            d = calculate_norm([vec_mouse_drag[0] - vec_mouse[0], vec_mouse_drag[1] - vec_mouse[1]]) * cos(theta)
-            theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
-            dx = d * cos(theta_x_axis)
-            #dy = d * sin(theta_x_axis)
-            theta_y_axis = angle_between_vectors(vec_mouse, [0, 1, 0])
-
-            t1 = create_from_translation([-center[0], -center[1], 0])
-            t2 = create_from_x_rotation(-theta_x_axis)
-
-            t3 = create_from_scale([1.0 + dx * 0.001,1.0 + dy * 0.001,1])
-            
-            t4 = create_from_x_rotation(theta_x_axis)
-            t5 = create_from_translation([center[0], center[1], 0])
-            
-            t = multiply(t4, t5)
-            t = multiply(t3, t)
-            t = multiply(t2, t)
-            t = multiply(t1, t)
-
-            t1 = create_from_translation([-center[0], -center[1], 0])
-            t2 = create_from_scale([1.0 + dx * 0.001,1.0 + dy * 0.001,1])
-            t3 = create_from_translation([center[0], center[1], 0])
-
-            t = multiply(t2, t3)
-            t = multiply(t1, t)"""
-            
-            """center = picked.get_center()
-            vec_mouse = [lastx - center[0], lasty - center[1]]
-            vec_mouse_drag = [x - lastx, y - lasty]
-
-            theta = angle_between_vectors(vec_mouse, vec_mouse_drag)
-            d = calculate_norm([vec_mouse_drag[0] - vec_mouse[0], vec_mouse_drag[1] - vec_mouse[1]]) 
-            theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
-            dx = abs(d * cos(theta_x_axis)) * 0.0001
-            
-
-            t1 = create_from_translation([-center[0], -center[1], 0])
-            
-            t2 = create_from_x_rotation(-theta_x_axis)
-            t3 = create_from_scale([1 + dx,1,1])
-            t4 = create_from_x_rotation(theta_x_axis)
-            
-            theta_y_axis = angle_between_vectors(vec_mouse, [0, -1, 0])
-            dy = abs(d * cos(theta_y_axis)) * 0.0001
-            t5 = create_from_y_rotation(-theta_y_axis)
-            t6 = create_from_scale([1, 1 + dy, 1])
-            t7 = create_from_y_rotation(theta_y_axis)
-
-            t8 = create_from_translation([center[0], center[1], 0])
-
-            t = multiply(t7, t8)
-            t = multiply(t6, t)
-            t = multiply(t5, t)
-            t = multiply(t4, t)
-            t = multiply(t3, t)
-            t = multiply(t2, t)
-            t = multiply(t1, t)
-
-            picked.set_matrix(multiply(picked.m,t))
-            lastx,lasty=x,y"""
             center = picked.get_center()
             vec_mouse = [lastx - center[0], lasty - center[1]]
             vec_mouse_drag = [x - lastx, y - lasty]
 
             # Calcula o ângulo de rotação necessário para alinhar vec_mouse com o eixo x
             theta = angle_between_vectors(vec_mouse, [1,0,0])
+            theta = angle_between_vectors(vec_mouse, [1, 0, 0])
+            # Verificar se vec_mouse está no primeiro ou segundo quadrante
+            if (vec_mouse[0] > 0 and vec_mouse[1] < 0) or (vec_mouse[0] < 0 and vec_mouse[1] < 0):
+                theta *= -1 # Inverter o sentido da rotação
 
-            # Calcula a distância entre o centro e o mouse
+            # Calcula a distância entre o centro e o clique do mouse
             distance = calculate_norm(vec_mouse)
 
             scale_factor = 0.0001  # Fator de escala (ajuste conforme necessário)
             scale_factor *= distance  # Ajuste do fator de escala com base na distância
 
+            # Move centro da figura para a origem 
             t1 = create_from_translation([-center[0], -center[1], 0])
 
+            # Rotaciona em torno de "z" para o eixo x para alinhar vec_mouse com o eixo x
             t2 = create_from_z_rotation(theta)
+            # Reproduz scale no eixo x
             t3 = create_from_scale([1 + scale_factor, 1, 1])
+            # Rotaciona devolta em torno de "z"
             t4 = create_from_z_rotation(-theta)
 
+            # Volta com o centro da figura para posição original
             t5 = create_from_translation([center[0], center[1], 0])
 
-            print(theta)
-            # Passo 1: Transladar para a origem
-            t6 = create_from_translation([-center[0], -center[1], 0])
-            angle = radians(-theta)  # Converter o ângulo para radianos
-            t7 = create_from_z_rotation(angle)
-            t8 = create_from_translation([center[0], center[1], 0])
-
-            t = multiply(t7, t8)
-            t = multiply(t6, t)
-            t = multiply(t5, t)
-            t = t5
-            t = multiply(t4, t)
+            # Sequência de transformações com multiplicações à direita
+            t = multiply(t4, t5)
             t = multiply(t3, t)
             t = multiply(t2, t)
             t = multiply(t1, t)
@@ -303,12 +218,13 @@ def mouse_drag(x, y):
 
 def display():
     glClear(GL_COLOR_BUFFER_BIT)
+    # Pinta o conteúdo das shapes (os triângulos que formam o círculo)
     for s in shapes:
         glColor3f(0.4,0.4,0.4)
         glPolygonMode(GL_FRONT_AND_BACK,GL_FILL)
         s.draw()
 
-        # desenha contorno
+        # Desenha contorno
         glColor3f(1,0,1)
         if isinstance(s, Circle):
             s.draw("outline")
