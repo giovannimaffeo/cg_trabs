@@ -102,7 +102,7 @@ class Rect(object):
         glPopMatrix()
 
 picked = None
-modeConstants = ["CREATE REACT", "CREATE CIRCLE", "TRANSLATE", "ROTATE", "CENTER"]
+modeConstants = ["CREATE REACT", "CREATE CIRCLE", "TRANSLATE", "ROTATE", "SCALE"]
 mode = modeConstants[0]
 
 def reshape( width, height):
@@ -119,16 +119,45 @@ def mouse (button, state, x, y):
         shapes.append(Rect([[x,y],[x,y]]))
     elif mode == "CREATE CIRCLE":
         shapes.append(Circle([x,y], 0))
-    elif mode == "TRANSLATE":
+    elif mode == "TRANSLATE" or mode == "ROTATE" or mode == "SCALE":
         picked = None
         for s in shapes:
             if s.contains([x,y]): picked = s
         lastx,lasty = x,y
-    elif mode == "ROTATE":
+    """elif mode == "SCALE":
         picked = None
         for s in shapes:
-            if s.contains([x,y]): picked = s
-        lastx,lasty = x,y             
+            if s.contains([x,y]):
+                print("picked")
+                picked = s
+                center = picked.get_center()
+                vec_mouse = [x - center[0], y - center[1]]
+                
+                # Calcula o ângulo entre o vetor vec_mouse e o eixo x
+                theta = angle_between_vectors(center, [1, 0, 0])
+                theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
+
+                print(theta)
+                print(theta_x_axis)
+                
+                # Calcula o fator de escala dx ao longo do vetor vec_mouse
+                dx = 100
+                
+                # Cria as transformações necessárias
+                t1 = create_from_translation([-center[0], -center[1], 0])
+                t2 = create_from_x_rotation(-theta_x_axis)
+                t3 = create_from_scale([1 + dx * 0.001, 1, 1])
+                print(theta_x_axis)
+                t4 = create_from_x_rotation(theta_x_axis - 0.16)
+                t5 = create_from_translation([center[0], center[1], 0])
+
+                # Multiplica as transformações na ordem correta
+                t = multiply(t4, t5)
+                t = multiply(t3, t)
+                t = multiply(t2, t)
+                t = multiply(t1, t)
+                
+                picked.set_matrix(multiply(picked.m, t))"""
 
 def mouse_drag(x, y):
     global lastx, lasty
@@ -163,6 +192,112 @@ def mouse_drag(x, y):
             t = multiply(t1, t)
             picked.set_matrix(multiply(picked.m, t))
 
+            lastx, lasty = x, y
+    elif mode == "SCALE":
+        if picked:
+            """center = picked.get_center()
+            vec_mouse = [lastx - center[0], lasty - center[1]]
+            vec_mouse_drag = [x - lastx, y - lasty]
+            theta = angle_between_vectors(vec_mouse, vec_mouse_drag)
+           
+            d = calculate_norm([vec_mouse_drag[0] - vec_mouse[0], vec_mouse_drag[1] - vec_mouse[1]]) * cos(theta)
+            theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
+            dx = d * cos(theta_x_axis)
+            #dy = d * sin(theta_x_axis)
+            theta_y_axis = angle_between_vectors(vec_mouse, [0, 1, 0])
+
+            t1 = create_from_translation([-center[0], -center[1], 0])
+            t2 = create_from_x_rotation(-theta_x_axis)
+
+            t3 = create_from_scale([1.0 + dx * 0.001,1.0 + dy * 0.001,1])
+            
+            t4 = create_from_x_rotation(theta_x_axis)
+            t5 = create_from_translation([center[0], center[1], 0])
+            
+            t = multiply(t4, t5)
+            t = multiply(t3, t)
+            t = multiply(t2, t)
+            t = multiply(t1, t)
+
+            t1 = create_from_translation([-center[0], -center[1], 0])
+            t2 = create_from_scale([1.0 + dx * 0.001,1.0 + dy * 0.001,1])
+            t3 = create_from_translation([center[0], center[1], 0])
+
+            t = multiply(t2, t3)
+            t = multiply(t1, t)"""
+            
+            """center = picked.get_center()
+            vec_mouse = [lastx - center[0], lasty - center[1]]
+            vec_mouse_drag = [x - lastx, y - lasty]
+
+            theta = angle_between_vectors(vec_mouse, vec_mouse_drag)
+            d = calculate_norm([vec_mouse_drag[0] - vec_mouse[0], vec_mouse_drag[1] - vec_mouse[1]]) 
+            theta_x_axis = angle_between_vectors(vec_mouse, [1, 0, 0])
+            dx = abs(d * cos(theta_x_axis)) * 0.0001
+            
+
+            t1 = create_from_translation([-center[0], -center[1], 0])
+            
+            t2 = create_from_x_rotation(-theta_x_axis)
+            t3 = create_from_scale([1 + dx,1,1])
+            t4 = create_from_x_rotation(theta_x_axis)
+            
+            theta_y_axis = angle_between_vectors(vec_mouse, [0, -1, 0])
+            dy = abs(d * cos(theta_y_axis)) * 0.0001
+            t5 = create_from_y_rotation(-theta_y_axis)
+            t6 = create_from_scale([1, 1 + dy, 1])
+            t7 = create_from_y_rotation(theta_y_axis)
+
+            t8 = create_from_translation([center[0], center[1], 0])
+
+            t = multiply(t7, t8)
+            t = multiply(t6, t)
+            t = multiply(t5, t)
+            t = multiply(t4, t)
+            t = multiply(t3, t)
+            t = multiply(t2, t)
+            t = multiply(t1, t)
+
+            picked.set_matrix(multiply(picked.m,t))
+            lastx,lasty=x,y"""
+            center = picked.get_center()
+            vec_mouse = [lastx - center[0], lasty - center[1]]
+            vec_mouse_drag = [x - lastx, y - lasty]
+
+            # Calcula o ângulo de rotação necessário para alinhar vec_mouse com o eixo x
+            theta = angle_between_vectors(vec_mouse, [1,0,0])
+
+            # Calcula a distância entre o centro e o mouse
+            distance = calculate_norm(vec_mouse)
+
+            scale_factor = 0.0001  # Fator de escala (ajuste conforme necessário)
+            scale_factor *= distance  # Ajuste do fator de escala com base na distância
+
+            t1 = create_from_translation([-center[0], -center[1], 0])
+
+            t2 = create_from_z_rotation(theta)
+            t3 = create_from_scale([1 + scale_factor, 1, 1])
+            t4 = create_from_z_rotation(-theta)
+
+            t5 = create_from_translation([center[0], center[1], 0])
+
+            print(theta)
+            # Passo 1: Transladar para a origem
+            t6 = create_from_translation([-center[0], -center[1], 0])
+            angle = radians(-theta)  # Converter o ângulo para radianos
+            t7 = create_from_z_rotation(angle)
+            t8 = create_from_translation([center[0], center[1], 0])
+
+            t = multiply(t7, t8)
+            t = multiply(t6, t)
+            t = multiply(t5, t)
+            t = t5
+            t = multiply(t4, t)
+            t = multiply(t3, t)
+            t = multiply(t2, t)
+            t = multiply(t1, t)
+
+            picked.set_matrix(multiply(picked.m, t))
             lastx, lasty = x, y
     glutPostRedisplay()
 
